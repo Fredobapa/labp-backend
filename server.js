@@ -2,30 +2,49 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
+// Middlewares
 app.use(cors());
 app.use(express.json());
 
-app.post("/analyze", (req, res) => {
-  const text = (req.body.text || "").toLowerCase();
-
-  let intent = "UNKNOWN";
-  let response = "I'm not sure I understood. Could you please rephrase?";
-
-  if (text.includes("price") || text.includes("cost")) {
-    intent = "PRICING";
-    response = "Our pricing starts from $X depending on your needs.";
-  } else if (text.includes("open") || text.includes("time") || text.includes("hour")) {
-    intent = "AVAILABILITY";
-    response = "We are available from 9am to 6pm.";
-  } else if (text.includes("help") || text.includes("support")) {
-    intent = "SUPPORT";
-    response = "Sure, I can help you. Please describe your issue.";
-  }
-
-  res.json({ intent, response });
+// Health check
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "labp-backend" });
 });
 
-app.listen(3000, () => {
-  console.log("Backend running on http://localhost:3000");
+// Core endpoint
+app.post("/analyze", (req, res) => {
+  const { text } = req.body;
+
+  if (!text) {
+    return res.status(400).json({
+      error: "Missing 'text' field in request body",
+    });
+  }
+
+  let intent = "UNKNOWN";
+  let response = "Sorry, I didn't understand that.";
+
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("price") || normalized.includes("pricing")) {
+    intent = "PRICING";
+    response = "Our pricing starts from $X depending on your needs.";
+  } else if (normalized.includes("hello") || normalized.includes("hi")) {
+    intent = "GREETING";
+    response = "Hello! How can I help you today?";
+  }
+
+  res.json({
+    intent,
+    response,
+  });
+});
+
+// 🔑 Railway-compatible port binding
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Backend running on port ${PORT}`);
 });
 
