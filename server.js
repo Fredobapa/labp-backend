@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check (Railway lo necesita)
+// Health check
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -14,6 +14,7 @@ app.get("/", (req, res) => {
   });
 });
 
+// Intent endpoint
 app.post("/analyze", (req, res) => {
   const { text } = req.body;
 
@@ -37,10 +38,9 @@ app.post("/analyze", (req, res) => {
   res.json({ intent, response });
 });
 
-// 🔑 CLAVE PARA RAILWAY (ESTO ES LO QUE FALTABA)
+// Railway production binding
 const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend listening on port ${PORT}`);
 });
-
