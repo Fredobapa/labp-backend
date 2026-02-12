@@ -1,123 +1,127 @@
+/**
+ * LABP-Stack Backend
+ * Production-grade API with observability
+ */
+
 const express = require("express");
 const cors = require("cors");
-const crypto = require("crypto");
+const { randomUUID } = require("crypto");
 
 const app = express();
+
+/* ========================
+   Middleware
+======================== */
 
 app.use(cors());
 app.use(express.json());
 
-// ---------- Logger ----------
-function log(level, event, data = {}) {
-  const entry = {
-    timestamp: new Date().toISOString(),
-    level,
-    event,
-    ...data,
-  };
-
-  console.log(JSON.stringify(entry));
-}
-
-// ---------- Request Tracker ----------
+/* Request Tracing + Logging */
 app.use((req, res, next) => {
-  req.requestId = crypto.randomUUID();
-  req.startTime = Date.now();
+  const requestId = randomUUID();
+  req.id = requestId;
 
-  log("INFO", "request_received", {
-    id: req.requestId,
-    method: req.method,
-    path: req.path,
-    ip: req.ip,
-  });
+  const start = Date.now();
 
   res.on("finish", () => {
-    const duration = Date.now() - req.startTime;
+    const duration = Date.now() - start;
 
-    log("INFO", "request_completed", {
-      id: req.requestId,
+    const log = {
+      request_id: requestId,
+      method: req.method,
+      path: req.originalUrl,
       status: res.statusCode,
       duration_ms: duration,
-    });
+      ip: req.ip,
+      user_agent: req.headers["user-agent"],
+      timestamp: new Date().toISOString()
+    };
+
+    console.log(JSON.stringify(log));
   });
 
   next();
 });
 
-// ---------- Health ----------
+/* ========================
+   Routes
+======================== */
+
+/* Healthcheck */
 app.get("/", (req, res) => {
-  res.json({
+  res.status(200).json({
     status: "ok",
     service: "labp-backend",
+    version: "1.0.0"
   });
 });
 
-// ---------- Intent Engine ----------
-function detectIntent(text) {
-  const t = text.toLowerCase();
+/* Intent API */
+app.post("/analyze", (req, res) => {
+  const { text } = req.body;
 
-  if (t.includes("price")) {
-    return {
-      intent: "PRICING",
-      response: "Our pricing starts from $X depending on your needs.",
-    };
-  }
-
-  if (t.includes("hello") || t.includes("hi")) {
-    return {
-      intent: "GREETING",
-      response: "Hello! How can I help you?",
-    };
-  }
-
-  return {
-    intent: "UNKNOWN",
-    response: "Sorry, I didn't understand that.",
-  };
-}
-
-// ---------- API ----------
-app.post("/analyze", (req, res, next) => {
-  try {
-    const { text } = req.body;
-
-    if (!text) {
-      log("WARN", "invalid_request", {
-        id: req.requestId,
-        reason: "missing_text",
-      });
-
-      return res.status(400).json({ error: "Missing text" });
-    }
-
-    const result = detectIntent(text);
-
-    log("INFO", "intent_detected", {
-      id: req.requestId,
-      input: text,
-      intent: result.intent,
+  if (!text) {
+    return res.status(400).json({
+      error: "Missing text",
+      request_id: req.id
     });
-
-    res.json(result);
-  } catch (err) {
-    next(err);
   }
-});
 
-// ---------- Error Handler ----------
-app.use((err, req, res, next) => {
-  log("ERROR", "unhandled_exception", {
-    id: req.requestId,
-    message: err.message,
-    stack: err.stack,
+  const normalized = text.toLowerCase();
+
+  let intent = "UNKNOWN";
+  let response = "Sorry, I didn't understand that.";
+
+  if (normalized.includes("price")) {
+    intent = "PRICING";
+    response = "Our pricing starts from $X depending on your needs.";
+  }
+
+  if (normalized.includes("hello") || normalized.includes("hi")) {
+    intent = "GREETING";
+    response = "Hello! How can I help you?";
+  }
+
+  res.json({
+    request_id: req.id,
+    intent,
+    response
   });
-
-  res.status(500).json({ error: "Internal Server Error" });
 });
 
-// ---------- Start ----------
-const PORT = process.env.PORT;
+/* ========================
+   Error Handler
+======================== */
+
+app.use((err, req, res, next) => {
+  console.error(
+    JSON.stringify({
+      request_id: req.id,
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString()
+    })
+  );
+
+  res.status(500).json({
+    error: "Internal Server Error",
+    request_id: req.id
+  });
+});
+
+/* ========================
+   Server
+======================== */
+
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  log("INFO", "server_started", { port: PORT });
+  console.log(
+    JSON.stringify({
+      event: "server_started",
+      port: PORT,
+      timestamp: new Date().toISOString()
+    })
+  );
 });
+
