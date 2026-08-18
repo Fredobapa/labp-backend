@@ -4,20 +4,21 @@
   "description": "LABP Stack backend - intent detection API",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "keywords": [
     "labp",
-    "ai",
     "backend",
-    "express",
-    "railway"
+    "express"
   ],
   "author": "Luis Alfredo Báez Páez",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2"
   }
 }
-
